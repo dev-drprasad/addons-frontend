@@ -1,4 +1,4 @@
-import { mount, shallow } from 'enzyme';
+import { mount } from 'enzyme';
 import config from 'config';
 import * as React from 'react';
 import { Provider } from 'react-redux';
@@ -18,14 +18,19 @@ import I18nProvider from 'core/i18n/Provider';
 import { createInternalAddon } from 'core/reducers/addons';
 import { getDiscoResults } from 'disco/actions';
 import { NAVIGATION_CATEGORY } from 'disco/constants';
-import * as helpers from 'disco/components/DiscoPane';
+import DiscoPane, {
+  DiscoPaneBase,
+  mapDispatchToProps,
+  mapStateToProps,
+} from 'disco/components/DiscoPane';
 import createStore from 'disco/store';
 import { makeQueryStringWithUTM } from 'disco/utils';
 import {
+  MockedSubComponent,
   createStubErrorHandler,
   fakeI18n,
   fakeRouterLocation,
-  MockedSubComponent,
+  shallowUntilTarget,
 } from 'tests/unit/helpers';
 import {
   fakeDiscoAddon,
@@ -33,9 +38,6 @@ import {
 } from 'tests/unit/disco/helpers';
 import Button from 'ui/components/Button';
 import ErrorList from 'ui/components/ErrorList';
-
-// Use DiscoPane that isn't wrapped in asyncConnect.
-const { DiscoPaneBase } = helpers;
 
 describe(__filename, () => {
   let fakeTracking;
@@ -49,7 +51,7 @@ describe(__filename, () => {
 
     let results;
     if (typeof customProps.results === 'undefined') {
-      const mappedProps = helpers.mapStateToProps(
+      const mappedProps = mapStateToProps(
         loadDiscoResultsIntoState([
           {
             heading: 'Discovery Addon 1',
@@ -70,26 +72,30 @@ describe(__filename, () => {
       dispatch: sinon.stub(),
       i18n,
       location: fakeRouterLocation(),
-      params: { platform: 'Darwin' },
+      match: {
+        params: { platform: 'Darwin' },
+      },
       results,
+      store: createStore().store,
       _tracking: fakeTracking,
       ...customProps,
     };
   }
 
   function render(props = {}) {
-    return shallow(<DiscoPaneBase {...renderProps(props)} />, {
-      params: { platform: 'Darwin' },
-    });
+    return shallowUntilTarget(
+      <DiscoPane {...renderProps(props)} />,
+      DiscoPaneBase,
+    );
   }
 
   function renderAndMount(customProps = {}) {
-    const { store } = createStore();
-    const props = renderProps(customProps);
+    const { store, i18n, ...props } = renderProps(customProps);
+
     return mount(
       <Provider store={store}>
-        <I18nProvider i18n={props.i18n}>
-          <DiscoPaneBase {...props} />
+        <I18nProvider i18n={i18n}>
+          <DiscoPane {...props} />
         </I18nProvider>
       </Provider>,
     );
@@ -99,7 +105,7 @@ describe(__filename, () => {
     it('sets extension results', () => {
       const addon = { ...fakeDiscoAddon };
 
-      const props = helpers.mapStateToProps(
+      const props = mapStateToProps(
         loadDiscoResultsIntoState([
           {
             heading: 'The Add-on',
@@ -137,7 +143,7 @@ describe(__filename, () => {
         type: ADDON_TYPE_THEME,
       };
 
-      const props = helpers.mapStateToProps(
+      const props = mapStateToProps(
         loadDiscoResultsIntoState([
           {
             heading: 'The Theme',
@@ -169,7 +175,7 @@ describe(__filename, () => {
         .stub(config, 'get')
         .withArgs('server')
         .returns(false);
-      const { handleGlobalEvent } = helpers.mapDispatchToProps(dispatch);
+      const { handleGlobalEvent } = mapDispatchToProps(dispatch);
       const payload = { id: 'whatever' };
       handleGlobalEvent(payload);
       sinon.assert.calledWith(dispatch, { type: INSTALL_STATE, payload });
@@ -179,19 +185,24 @@ describe(__filename, () => {
       const dispatch = sinon.stub();
       const configSource = { server: true };
       const configStub = { get: (key) => configSource[key] };
-      expect(
-        helpers.mapDispatchToProps(dispatch, { _config: configStub }),
-      ).toEqual({ dispatch });
+      expect(mapDispatchToProps(dispatch, { _config: configStub })).toEqual({
+        dispatch,
+      });
     });
   });
 
   describe('constructor', () => {
-    it('gets discovery results when results are empty', () => {
-      const dispatch = sinon.stub();
-      const errorHandler = new ErrorHandler({ id: 'some-id', dispatch });
-      const props = helpers.mapStateToProps(loadDiscoResultsIntoState([]));
+    let store;
 
-      render({ errorHandler, dispatch, ...props });
+    beforeEach(() => {
+      store = createStore().store;
+    });
+
+    it('gets discovery results when results are empty', () => {
+      const dispatch = sinon.spy(store, 'dispatch');
+      const errorHandler = new ErrorHandler({ id: 'some-id', dispatch });
+
+      render({ errorHandler, store });
 
       sinon.assert.calledWith(
         dispatch,
@@ -208,12 +219,10 @@ describe(__filename, () => {
           clientId: 'telemetry-client-id',
         },
       });
-      const dispatch = sinon.stub();
+      const dispatch = sinon.spy(store, 'dispatch');
       const errorHandler = new ErrorHandler({ id: 'some-id', dispatch });
-      // Set up some empty results so that the component fetches new ones.
-      const props = helpers.mapStateToProps(loadDiscoResultsIntoState([]));
 
-      render({ errorHandler, dispatch, location, ...props });
+      render({ errorHandler, location, store });
 
       sinon.assert.calledWith(
         dispatch,
@@ -235,12 +244,10 @@ describe(__filename, () => {
           study: 'bar',
         },
       });
-      const dispatch = sinon.stub();
+      const dispatch = sinon.spy(store, 'dispatch');
       const errorHandler = new ErrorHandler({ id: 'some-id', dispatch });
-      // Set up some empty results so that the component fetches new ones.
-      const props = helpers.mapStateToProps(loadDiscoResultsIntoState([]));
 
-      render({ errorHandler, dispatch, location, ...props });
+      render({ errorHandler, location, store });
 
       sinon.assert.calledWith(
         dispatch,
@@ -262,12 +269,10 @@ describe(__filename, () => {
           platform: 'bar',
         },
       });
-      const dispatch = sinon.stub();
+      const dispatch = sinon.spy(store, 'dispatch');
       const errorHandler = new ErrorHandler({ id: 'some-id', dispatch });
-      // Set up some empty results so that the component fetches new ones.
-      const props = helpers.mapStateToProps(loadDiscoResultsIntoState([]));
 
-      render({ errorHandler, dispatch, location, ...props });
+      render({ errorHandler, location, store });
 
       sinon.assert.calledWith(
         dispatch,
@@ -279,9 +284,10 @@ describe(__filename, () => {
     });
 
     it('does not get discovery results when results are loaded', () => {
-      const dispatch = sinon.stub();
-      const props = helpers.mapStateToProps(
-        loadDiscoResultsIntoState([
+      const dispatch = sinon.spy(store, 'dispatch');
+
+      loadDiscoResultsIntoState(
+        [
           {
             heading: 'Discovery Addon 1',
             description: 'informative text',
@@ -291,24 +297,29 @@ describe(__filename, () => {
               slug: 'discovery-addon-1',
             },
           },
-        ]),
+        ],
+        { store },
       );
+      dispatch.resetHistory();
 
-      render({ dispatch, ...props });
+      render({ store });
 
       sinon.assert.notCalled(dispatch);
     });
 
     it('does not get results if there was an error', () => {
-      const dispatch = sinon.stub();
+      const dispatch = sinon.spy(store, 'dispatch');
+
       const errorHandler = new ErrorHandler({
         id: 'some-id',
         dispatch,
         capturedError: new Error('some API error'),
       });
-      const props = helpers.mapStateToProps(loadDiscoResultsIntoState([]));
 
-      render({ errorHandler, dispatch, ...props });
+      loadDiscoResultsIntoState([], { store });
+      dispatch.resetHistory();
+
+      render({ errorHandler, store });
 
       sinon.assert.notCalled(dispatch);
     });

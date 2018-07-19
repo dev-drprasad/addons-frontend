@@ -4,7 +4,7 @@ import { oneLineTrim } from 'common-tags';
 import invariant from 'invariant';
 import * as React from 'react';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router';
+import { withRouter } from 'react-router-dom';
 import { CSSTransition, TransitionGroup } from 'react-transition-group';
 import { compose } from 'redux';
 import config from 'config';
@@ -37,7 +37,7 @@ import type { I18nType } from 'core/types/i18n';
 import type { ElementEvent } from 'core/types/dom';
 import type { ErrorHandlerType } from 'core/errorHandler';
 import type { DispatchFunc } from 'core/types/redux';
-import type { ReactRouterType } from 'core/types/router';
+import type { ReactRouterHistoryType } from 'core/types/router';
 
 import './styles.scss';
 
@@ -69,7 +69,7 @@ type InternalProps = {|
   hasAddonBeenAdded: boolean,
   i18n: I18nType,
   isCollectionBeingModified: boolean,
-  router: ReactRouterType,
+  history: ReactRouterHistoryType,
   setTimeout: Function,
   siteLang: ?string,
 |};
@@ -139,14 +139,14 @@ export class CollectionManagerBase extends React.Component<
       creating,
       errorHandler,
       filters,
-      router,
+      history,
       siteLang,
     } = this.props;
     event.preventDefault();
     event.stopPropagation();
 
     if (creating) {
-      router.goBack();
+      history.goBack();
     }
 
     invariant(collection, 'A collection must be loaded before you can cancel');
@@ -158,7 +158,7 @@ export class CollectionManagerBase extends React.Component<
     errorHandler.clear();
 
     const { authorUsername, slug } = collection;
-    router.push({
+    history.push({
       pathname: `/${siteLang}/${clientApp}/collections/${authorUsername}/${slug}/`,
       query: convertFiltersToQueryParams(filters),
     });

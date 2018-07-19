@@ -22,8 +22,9 @@ import {
   fakeAddon,
 } from 'tests/unit/amo/helpers';
 import {
+  createContextWithFakeRouter,
   createFakeEvent,
-  createFakeRouter,
+  createFakeHistory,
   fakeI18n,
   shallowUntilTarget,
 } from 'tests/unit/helpers';
@@ -41,17 +42,21 @@ describe(__filename, () => {
     return {
       addon: createInternalAddon(fakeAddon),
       i18n: fakeI18n(),
-      router: createFakeRouter(),
+      history: createFakeHistory(),
       store,
       ...customProps,
     };
   };
 
   const render = (customProps = {}) => {
-    const props = getProps(customProps);
+    const { history, ...props } = getProps(customProps);
+
     return shallowUntilTarget(
       <AddAddonToCollection {...props} />,
       AddAddonToCollectionBase,
+      {
+        shallowOptions: createContextWithFakeRouter({ history }),
+      },
     );
   };
 
@@ -386,8 +391,8 @@ describe(__filename, () => {
         lang,
       });
 
-      const routerSpy = createFakeRouter();
-      const root = render({ addon, router: routerSpy });
+      const historySpy = createFakeHistory();
+      const root = render({ addon, history: historySpy });
 
       const select = root.find('.AddAddonToCollection-select');
       const createOption = findOption({
@@ -403,7 +408,7 @@ describe(__filename, () => {
       );
 
       sinon.assert.calledWith(
-        routerSpy.push,
+        historySpy.push,
         `/${lang}/${clientApp}/collections/add/`,
       );
     });

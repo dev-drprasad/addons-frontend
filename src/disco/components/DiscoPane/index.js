@@ -30,8 +30,10 @@ export class DiscoPaneBase extends React.Component {
     i18n: PropTypes.object.isRequired,
     location: PropTypes.object.isRequired,
     mozAddonManager: PropTypes.object,
-    params: PropTypes.shape({
-      platform: PropTypes.string.isRequired,
+    match: PropTypes.shape({
+      params: PropTypes.shape({
+        platform: PropTypes.string.isRequired,
+      }).isRequired,
     }).isRequired,
     results: PropTypes.arrayOf(PropTypes.object).isRequired,
     _addChangeListeners: PropTypes.func,
@@ -48,7 +50,7 @@ export class DiscoPaneBase extends React.Component {
   constructor(props) {
     super(props);
 
-    const { dispatch, errorHandler, location, params, results } = props;
+    const { dispatch, errorHandler, location, match, results } = props;
     // TODO: fix this; it's not the right way to detect whether a
     // dispatch is needed. This should look for an undefined value
     // instead of an empty list because an empty list could be a valid
@@ -57,7 +59,7 @@ export class DiscoPaneBase extends React.Component {
       // We accept all query params here and filter them out based on the
       // `discoParamsToUse` config value. See:
       // https://github.com/mozilla/addons-frontend/issues/4155
-      const taarParams = { ...location.query, platform: params.platform };
+      const taarParams = { ...location.query, platform: match.params.platform };
 
       dispatch(
         getDiscoResults({

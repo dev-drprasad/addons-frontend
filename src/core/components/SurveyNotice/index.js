@@ -10,7 +10,7 @@ import { compose } from 'redux';
 import translate from 'core/i18n/translate';
 import { dismissSurvey } from 'core/reducers/survey';
 import Notice from 'ui/components/Notice';
-import type { ReactRouterLocation } from 'core/types/router';
+import type { ReactRouterLocationType } from 'core/types/router';
 import type { I18nType } from 'core/types/i18n';
 import type { DispatchFunc } from 'core/types/redux';
 import type { AppState } from 'amo/store';
@@ -18,7 +18,7 @@ import type { AppState } from 'amo/store';
 import './styles.scss';
 
 type Props = {|
-  location: ReactRouterLocation,
+  location: ReactRouterLocationType,
 |};
 
 type InternalProps = {|

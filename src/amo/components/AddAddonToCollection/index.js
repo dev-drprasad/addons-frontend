@@ -1,7 +1,7 @@
 /* @flow */
 import * as React from 'react';
 import { connect } from 'react-redux';
-import { withRouter } from 'react-router';
+import { withRouter } from 'react-router-dom';
 import { compose } from 'redux';
 
 import {
@@ -23,7 +23,7 @@ import type { DispatchFunc } from 'core/types/redux';
 import type { CollectionType } from 'amo/reducers/collections';
 import type { AppState } from 'amo/store';
 import type { ElementEvent } from 'core/types/dom';
-import type { ReactRouterType } from 'core/types/router';
+import type { ReactRouterHistoryType } from 'core/types/router';
 
 import './styles.scss';
 
@@ -40,7 +40,7 @@ type InternalProps = {|
   dispatch: DispatchFunc,
   errorHandler: ErrorHandlerType,
   i18n: I18nType,
-  router: ReactRouterType,
+  history: ReactRouterHistoryType,
   lang: string,
   loadingAddonsInCollections: boolean,
   loadingUserCollections: boolean,
@@ -163,7 +163,7 @@ export class AddAddonToCollectionBase extends React.Component<InternalProps> {
       lang,
       loadingAddonsInCollections,
       loadingUserCollections,
-      router,
+      history,
       userCollections,
     } = this.props;
 
@@ -202,7 +202,7 @@ export class AddAddonToCollectionBase extends React.Component<InternalProps> {
         onSelect: () => {
           // TODO: show create collection overlay when it's implemented.
           // See: https://github.com/mozilla/addons-frontend/issues/3993
-          router.push(`/${lang}/${clientApp}/collections/add/`);
+          history.push(`/${lang}/${clientApp}/collections/add/`);
         },
       }),
     );

@@ -45,15 +45,21 @@ import type { AppState } from 'amo/store';
 import type { UserReviewType } from 'amo/actions/reviews';
 import type { UserType } from 'amo/reducers/users';
 import type { DispatchFunc } from 'core/types/redux';
-import type { ReactRouterLocation } from 'core/types/router';
+import type {
+  ReactRouterLocationType,
+  ReactRouterMatchType,
+} from 'core/types/router';
 import type { ErrorHandlerType } from 'core/errorHandler';
 import type { I18nType } from 'core/types/i18n';
 
 import './styles.scss';
 
 type Props = {|
-  location: ReactRouterLocation,
-  params: {| username: string |},
+  location: ReactRouterLocationType,
+  match: {|
+    ...ReactRouterMatchType,
+    params: {| username: string |},
+  |},
 |};
 
 type InternalProps = {|
@@ -76,7 +82,8 @@ export class UserProfileBase extends React.Component<InternalProps> {
       dispatch,
       errorHandler,
       isOwner,
-      params,
+      location,
+      match,
       reviews,
       user,
     } = this.props;
@@ -90,14 +97,14 @@ export class UserProfileBase extends React.Component<InternalProps> {
       dispatch(
         fetchUserAccount({
           errorHandlerId: errorHandler.id,
-          username: params.username,
+          username: match.params.username,
         }),
       );
     } else if (isOwner && !reviews) {
       dispatch(
         fetchUserReviews({
           errorHandlerId: errorHandler.id,
-          page: this.getReviewsPage(),
+          page: this.getReviewsPage(location),
           userId: user.id,
         }),
       );
@@ -107,7 +114,7 @@ export class UserProfileBase extends React.Component<InternalProps> {
   componentWillReceiveProps({
     isOwner,
     location: newLocation,
-    params: newParams,
+    match: newMatch,
     reviews,
     user,
   }: InternalProps) {
@@ -115,14 +122,14 @@ export class UserProfileBase extends React.Component<InternalProps> {
       dispatch,
       errorHandler,
       location: oldLocation,
-      params: oldParams,
+      match: oldMatch,
     } = this.props;
 
-    if (oldParams.username !== newParams.username) {
+    if (oldMatch.params.username !== newMatch.params.username) {
       dispatch(
         fetchUserAccount({
           errorHandlerId: errorHandler.id,
-          username: newParams.username,
+          username: newMatch.params.username,
         }),
       );
     } else if (
@@ -133,7 +140,7 @@ export class UserProfileBase extends React.Component<InternalProps> {
       dispatch(
         fetchUserReviews({
           errorHandlerId: errorHandler.id,
-          page: newLocation.query.page || 1,
+          page: this.getReviewsPage(newLocation),
           userId: user.id,
         }),
       );
@@ -141,7 +148,7 @@ export class UserProfileBase extends React.Component<InternalProps> {
   }
 
   getURL() {
-    const { params } = this.props;
+    const { params } = this.props.match;
 
     return `/user/${params.username}/`;
   }
@@ -159,9 +166,7 @@ export class UserProfileBase extends React.Component<InternalProps> {
     return `${this.getURL()}edit/`;
   }
 
-  getReviewsPage() {
-    const { location } = this.props;
-
+  getReviewsPage(location: ReactRouterLocationType): number {
     const currentPage = parseInt(location.query.page, 10);
 
     return Number.isNaN(currentPage) || currentPage < 1 ? 1 : currentPage;
@@ -186,7 +191,7 @@ export class UserProfileBase extends React.Component<InternalProps> {
         <Paginate
           LinkComponent={Link}
           count={reviewCount}
-          currentPage={this.getReviewsPage()}
+          currentPage={this.getReviewsPage(location)}
           pathname={this.getURL()}
           perPage={pageSize}
           queryParams={location.query}
@@ -227,7 +232,7 @@ export class UserProfileBase extends React.Component<InternalProps> {
       errorHandler,
       i18n,
       isOwner,
-      params,
+      match,
       user,
     } = this.props;
 
@@ -241,6 +246,8 @@ export class UserProfileBase extends React.Component<InternalProps> {
 
       errorMessage = errorHandler.renderError();
     }
+
+    const { params } = match;
 
     const userProfileHeader = (
       <div className="UserProfile-header">
@@ -416,7 +423,7 @@ export class UserProfileBase extends React.Component<InternalProps> {
 
 export function mapStateToProps(state: AppState, ownProps: Props) {
   const currentUser = getCurrentUser(state.users);
-  const user = getUserByUsername(state.users, ownProps.params.username);
+  const user = getUserByUsername(state.users, ownProps.match.params.username);
   const isOwner = currentUser && user && currentUser.id === user.id;
 
   const canEditProfile =
@@ -438,7 +445,7 @@ export function mapStateToProps(state: AppState, ownProps: Props) {
 }
 
 export const extractId = (ownProps: Props) => {
-  return ownProps.params.username;
+  return ownProps.match.params.username;
 };
 
 const UserProfile: React.ComponentType<Props> = compose(
