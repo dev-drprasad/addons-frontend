@@ -1,0 +1,3 @@
+declare var InstallTrigger: {|
+  install: Function,
+|};

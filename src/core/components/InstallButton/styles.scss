@@ -1,3 +1,4 @@
+@import '~photon-colors/photon-colors';
 @import '~core/css/inc/vars';
 @import '~core/css/inc/mixins';
 
@@ -9,20 +10,20 @@
       @include disabled();
     }
 
-    .Icon {
+    &.Button .Icon {
       margin-top: -2px;
     }
   }
 
-  &.InstallButton--use-button {
-    .InstallButton-switch {
-      display: none;
-    }
-  }
+  .InstallButton-loading {
+    background-color: $grey-20;
+    border-radius: 2px;
+    height: 32px;
+    text-align: center;
+    width: 32px;
 
-  &.InstallButton--use-switch {
-    .InstallButton-button {
-      display: none;
+    .AnimatedIcon-loading {
+      margin-top: 14px;
     }
   }
 }

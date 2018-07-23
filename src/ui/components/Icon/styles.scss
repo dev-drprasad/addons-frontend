@@ -295,3 +295,7 @@
 .Icon-artist {
   @include icon($name: 'artist');
 }
+
+.Icon-delete {
+  @include icon($name: 'delete');
+}

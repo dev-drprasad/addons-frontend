@@ -68,11 +68,15 @@ export class AddonBase extends React.Component {
     // This prop is passed in by withInstallHelpers()
     defaultInstallSource: PropTypes.string.isRequired,
     dispatch: PropTypes.func.isRequired,
+    enable: PropTypes.func.isRequired,
     errorHandler: PropTypes.object.isRequired,
     getClientCompatibility: PropTypes.func,
     i18n: PropTypes.object.isRequired,
-    platformFiles: PropTypes.object,
+    install: PropTypes.func.isRequired,
+    installTheme: PropTypes.func.isRequired,
     lang: PropTypes.string.isRequired,
+    platformFiles: PropTypes.object,
+    uninstall: PropTypes.func.isRequired,
     // See ReactRouterLocation in 'core/types/router'
     location: PropTypes.object.isRequired,
     params: PropTypes.object.isRequired,
@@ -384,10 +388,14 @@ export class AddonBase extends React.Component {
       clientApp,
       config,
       defaultInstallSource,
+      enable,
       errorHandler,
       getClientCompatibility,
       i18n,
+      install,
       installStatus,
+      installTheme,
+      uninstall,
       userAgentInfo,
     } = this.props;
 
@@ -526,14 +534,17 @@ export class AddonBase extends React.Component {
                 {addon &&
                   isFireFox && (
                     <InstallButton
-                      {...this.props}
+                      addon={addon}
+                      defaultInstallSource={defaultInstallSource}
                       disabled={!isCompatible}
+                      enable={enable}
+                      install={install}
+                      installTheme={installTheme}
                       ref={(ref) => {
                         this.installButton = ref;
                       }}
-                      defaultInstallSource={defaultInstallSource}
                       status={installStatus}
-                      useButton
+                      uninstall={uninstall}
                     />
                   )}
                 {addon &&

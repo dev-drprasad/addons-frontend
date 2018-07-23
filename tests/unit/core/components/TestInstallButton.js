@@ -7,7 +7,6 @@ import InstallButton, {
   getFileHash,
   InstallButtonBase,
 } from 'core/components/InstallButton';
-import InstallSwitch from 'core/components/InstallSwitch';
 import I18nProvider from 'core/i18n/Provider';
 import {
   ADDON_TYPE_EXTENSION,

@@ -1,22 +1,27 @@
+/* @flow */
 /* global InstallTrigger, window */
 import makeClassName from 'classnames';
 import { oneLine } from 'common-tags';
 import config from 'config';
 import * as React from 'react';
-import PropTypes from 'prop-types';
 import { compose } from 'redux';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router';
 
 import { getAddonIconUrl } from 'core/imageUtils';
-import InstallSwitch from 'core/components/InstallSwitch';
 import {
   ADDON_TYPE_OPENSEARCH,
   ADDON_TYPE_THEME,
   ADDON_TYPE_THEMES,
+  DISABLED,
+  DOWNLOADING,
+  ENABLED,
+  ENABLING,
+  INSTALLED,
+  INSTALLING,
   INSTALL_ACTION,
   INSTALL_STARTED_ACTION,
-  validAddonTypes,
+  UNINSTALLING,
 } from 'core/constants';
 import translate from 'core/i18n/translate';
 import { findInstallURL } from 'core/installAddon';
@@ -26,13 +31,66 @@ import tracking, {
   getAddonTypeForTracking,
   getAddonEventCategory,
 } from 'core/tracking';
-import { getClientCompatibility as _getClientCompatibility } from 'core/utils/compatibility';
+import { getClientCompatibility } from 'core/utils/compatibility';
+import AnimatedIcon from 'ui/components/AnimatedIcon';
 import Button from 'ui/components/Button';
 import Icon from 'ui/components/Icon';
+import type { AppState } from 'amo/store';
+import type { AddonType } from 'core/types/addons';
+import type { I18nType } from 'core/types/i18n';
+import type { ReactRouterLocation } from 'core/types/router';
 
 import './styles.scss';
 
-export const getFileHash = ({ addon, installURL } = {}) => {
+type Props = {|
+  addon: AddonType,
+  className?: string,
+  defaultInstallSource: string,
+  disabled: boolean,
+  location: ReactRouterLocation,
+  status: string,
+  // From `withInstallHelpers()`, see: `src/core/installAddon.js`.
+  enable: Function,
+  install: Function,
+  installTheme: Function,
+  uninstall: Function,
+|};
+
+type InternalProps = {|
+  ...Props,
+  _InstallTrigger: typeof InstallTrigger,
+  _config: typeof config,
+  _getClientCompatibility: Function,
+  _log: typeof log,
+  _tracking: typeof tracking,
+  _window: typeof window,
+  clientApp: string,
+  i18n: I18nType,
+  userAgentInfo: string,
+|};
+
+type TrackParams = {|
+  addonName: string,
+  type: string,
+|};
+
+type ButtonProps = {|
+  buttonType: string,
+  'data-browsertheme'?: string,
+  href: string,
+  onClick: Function,
+  prependClientApp?: boolean,
+  prependLang?: boolean,
+|};
+
+type GetFileHashParams = {|
+  addon: AddonType,
+  installURL: string,
+|};
+
+export const getFileHash = ({ addon, installURL }: GetFileHashParams = {}):
+  | string
+  | typeof undefined => {
   if (!addon) {
     throw new Error('The addon parameter cannot be empty');
   }
@@ -62,70 +120,47 @@ export const getFileHash = ({ addon, installURL } = {}) => {
   return undefined;
 };
 
-export class InstallButtonBase extends React.Component {
-  static propTypes = {
-    accentcolor: PropTypes.string,
-    addon: PropTypes.object.isRequired,
-    author: PropTypes.string,
-    category: PropTypes.string,
-    className: PropTypes.string,
-    clientApp: PropTypes.string.isRequired,
-    defaultInstallSource: PropTypes.string.isRequired,
-    description: PropTypes.string,
-    detailURL: PropTypes.string,
-    enable: PropTypes.func,
-    footer: PropTypes.string,
-    footerURL: PropTypes.string,
-    getClientCompatibility: PropTypes.func,
-    guid: PropTypes.string.isRequired,
-    handleChange: PropTypes.func,
-    hasAddonManager: PropTypes.bool,
-    header: PropTypes.string,
-    headerURL: PropTypes.string,
-    i18n: PropTypes.object.isRequired,
-    iconURL: PropTypes.string,
-    id: PropTypes.string,
-    install: PropTypes.func.isRequired,
-    installTheme: PropTypes.func.isRequired,
-    // See ReactRouterLocation in 'core/types/router'
-    location: PropTypes.object.isRequired,
-    name: PropTypes.string.isRequired,
-    previewURL: PropTypes.string,
-    slug: PropTypes.string.isRequired,
-    status: PropTypes.string.isRequired,
-    textcolor: PropTypes.string,
-    type: PropTypes.oneOf(validAddonTypes),
-    uninstall: PropTypes.func.isRequired,
-    updateURL: PropTypes.string,
-    useButton: PropTypes.bool,
-    userAgentInfo: PropTypes.string.isRequired,
-    version: PropTypes.string,
-    _InstallTrigger: PropTypes.object,
-    _config: PropTypes.object,
-    _log: PropTypes.object,
-    _tracking: PropTypes.object,
-    _window: PropTypes.object,
-  };
-
+export class InstallButtonBase extends React.Component<InternalProps> {
   static defaultProps = {
-    getClientCompatibility: _getClientCompatibility,
-    useButton: false,
     _InstallTrigger:
       typeof InstallTrigger !== 'undefined' ? InstallTrigger : null,
     _config: config,
+    _getClientCompatibility: getClientCompatibility,
     _log: log,
     _tracking: tracking,
     _window: typeof window !== 'undefined' ? window : {},
   };
 
-  installTheme = (event) => {
-    event.preventDefault();
+  installTheme = (event: SyntheticEvent<HTMLAnchorElement>) => {
     const { addon, status, installTheme } = this.props;
+
+    event.preventDefault();
+    event.stopPropagation();
+
     installTheme(event.currentTarget, { ...addon, status });
   };
 
-  installExtension = ({ installURL, event }) => {
-    const { addon, _InstallTrigger } = this.props;
+  installOpenSearch = (event: SyntheticEvent<HTMLAnchorElement>) => {
+    const { _log, _window, addon } = this.props;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const installURL = event.currentTarget.href;
+
+    _log.info('Adding OpenSearch Provider', { addon });
+    _window.external.AddSearchProvider(installURL);
+
+    this.trackInstallStarted({
+      addonName: addon.name,
+      type: addon.type,
+    });
+
+    return false;
+  };
+
+  installExtension = (event: SyntheticEvent<HTMLAnchorElement>) => {
+    const { _InstallTrigger, addon } = this.props;
     const { name, type } = addon;
 
     this.trackInstallStarted({ addonName: name, type });
@@ -139,6 +174,8 @@ export class InstallButtonBase extends React.Component {
 
     event.preventDefault();
     event.stopPropagation();
+
+    const installURL = event.currentTarget.href;
 
     // This is a Firefox API for installing extensions that
     // pre-dates mozAddonManager.
@@ -174,7 +211,21 @@ export class InstallButtonBase extends React.Component {
     return false;
   };
 
-  trackInstallStarted({ addonName, type }) {
+  uninstallAddon = (event: SyntheticEvent<HTMLAnchorElement>) => {
+    const { addon, uninstall } = this.props;
+    const { guid, name, type } = addon;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const installURL = event.currentTarget.href;
+
+    uninstall({ guid, installURL, name, type });
+
+    return false;
+  };
+
+  trackInstallStarted({ addonName, type }: TrackParams) {
     const { _tracking } = this.props;
 
     _tracking.sendEvent({
@@ -184,7 +235,7 @@ export class InstallButtonBase extends React.Component {
     });
   }
 
-  trackInstallSucceeded({ addonName, type }) {
+  trackInstallSucceeded({ addonName, type }: TrackParams) {
     const { _tracking } = this.props;
 
     _tracking.sendEvent({
@@ -194,20 +245,60 @@ export class InstallButtonBase extends React.Component {
     });
   }
 
+  showLoadingAnimation() {
+    return [DOWNLOADING, ENABLING, INSTALLING, UNINSTALLING].includes(
+      this.props.status,
+    );
+  }
+
+  getButtonText() {
+    const { addon, i18n, status } = this.props;
+
+    switch (status) {
+      case DISABLED:
+      case ENABLED:
+      case INSTALLED:
+        return i18n.gettext('Remove');
+      case ENABLING:
+        return i18n.gettext('Enabling');
+      case DOWNLOADING:
+        return i18n.gettext('Downloading');
+      case INSTALLING:
+        return i18n.gettext('Installing');
+      case UNINSTALLING:
+        return i18n.gettext('Uninstalling');
+      default:
+        return ADDON_TYPE_THEMES.includes(addon.type)
+          ? i18n.gettext('Install Theme')
+          : i18n.gettext('Add to Firefox');
+    }
+  }
+
+  getIconName() {
+    const { status } = this.props;
+
+    switch (status) {
+      case DISABLED:
+      case ENABLED:
+      case INSTALLED:
+        return 'delete';
+      default:
+        return 'plus';
+    }
+  }
+
   render() {
     const {
-      addon,
-      clientApp,
-      className,
-      defaultInstallSource,
-      getClientCompatibility,
-      hasAddonManager,
-      i18n,
-      location,
-      userAgentInfo,
       _config,
+      _getClientCompatibility,
       _log,
-      _window,
+      addon,
+      className,
+      clientApp,
+      defaultInstallSource,
+      location,
+      status,
+      userAgentInfo,
     } = this.props;
 
     if (addon.type === ADDON_TYPE_OPENSEARCH && _config.get('server')) {
@@ -215,29 +306,17 @@ export class InstallButtonBase extends React.Component {
       return null;
     }
 
-    // OpenSearch plugins display their own prompt so using the "Add to
-    // Firefox" button regardless on mozAddonManager support is a better UX.
-    const useButton =
-      (hasAddonManager !== undefined && !hasAddonManager) ||
-      addon.type === ADDON_TYPE_OPENSEARCH ||
-      this.props.useButton;
-    let button;
-
-    const { compatible } = getClientCompatibility({
+    const { compatible } = _getClientCompatibility({
       addon,
       clientApp,
       userAgentInfo,
     });
 
     const buttonIsDisabled = !compatible;
-    const buttonClass = makeClassName(
-      'InstallButton-button',
-      'Button--action',
-      className,
-      {
-        'InstallButton-button--disabled': buttonIsDisabled,
-      },
-    );
+    const buttonClass = makeClassName('InstallButton-button', className, {
+      'InstallButton-button--disabled': buttonIsDisabled,
+    });
+
     const installURL = findInstallURL({
       defaultInstallSource,
       location,
@@ -245,145 +324,57 @@ export class InstallButtonBase extends React.Component {
       userAgentInfo,
     });
 
-    if (addon.type === ADDON_TYPE_THEME) {
-      button = (
-        <Button
-          buttonType="action"
-          className={buttonClass}
-          disabled={buttonIsDisabled}
-          data-browsertheme={JSON.stringify(getThemeData(addon))}
-          onClick={this.installTheme}
-          puffy
-        >
-          <Icon name="plus" />
-          {i18n.gettext('Install Theme')}
-        </Button>
-      );
-    } else if (addon.type === ADDON_TYPE_OPENSEARCH) {
-      const onClick = buttonIsDisabled
-        ? null
-        : (event) => {
-            event.preventDefault();
-            event.stopPropagation();
+    const buttonProps: ButtonProps = {
+      buttonType: 'action',
+      href: installURL,
+      onClick: (event) => event.preventDefault(),
+    };
 
-            _log.info('Adding OpenSearch Provider', { addon });
-            _window.external.AddSearchProvider(installURL);
-            this.trackInstallStarted({
-              addonName: addon.name,
-              type: addon.type,
-            });
-
-            return false;
-          };
-      button = (
-        <Button
-          buttonType="action"
-          className={buttonClass}
-          disabled={buttonIsDisabled}
-          onClick={onClick}
-          href={installURL}
-          prependClientApp={false}
-          prependLang={false}
-          puffy
-        >
-          <Icon name="plus" />
-          {i18n.gettext('Add to Firefox')}
-        </Button>
-      );
-    } else {
-      const onClick = buttonIsDisabled
-        ? (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            return false;
-          }
-        : (event) => {
-            this.installExtension({ event, installURL });
-          };
-
-      const buttonText = ADDON_TYPE_THEMES.includes(addon.type)
-        ? i18n.gettext('Install Theme')
-        : i18n.gettext('Add to Firefox');
-
-      button = (
-        <Button
-          buttonType="action"
-          className={buttonClass}
-          disabled={buttonIsDisabled}
-          onClick={onClick}
-          href={installURL}
-          prependClientApp={false}
-          prependLang={false}
-          puffy
-        >
-          <Icon name="plus" />
-          {buttonText}
-        </Button>
-      );
+    if (!buttonIsDisabled) {
+      if ([DISABLED, ENABLED, INSTALLED].includes(status)) {
+        buttonProps.buttonType = 'neutral';
+        buttonProps.onClick = this.uninstallAddon;
+      } else if (addon.type === ADDON_TYPE_THEME) {
+        buttonProps['data-browsertheme'] = JSON.stringify(getThemeData(addon));
+        buttonProps.onClick = this.installTheme;
+      } else {
+        buttonProps.onClick =
+          addon.type === ADDON_TYPE_OPENSEARCH
+            ? this.installOpenSearch
+            : this.installExtension;
+        buttonProps.prependClientApp = false;
+        buttonProps.prependLang = false;
+      }
     }
+
     return (
-      <div
-        className={makeClassName('InstallButton', {
-          'InstallButton--use-button': useButton,
-          'InstallButton--use-switch': !useButton,
-        })}
-      >
-        {/*
-          Some of these props are spread into InstallButton by:
-          - the parent component
-          - a state/dispatch mapper
-          - a higher-order component (HOC)
-          - evil clowns (maybe)
-          - or something else we aren't sure of
-          Also, some of these props are not used directly by `InstallSwitch`;
-          they are required for `getThemeData()`.
-        */}
-        <InstallSwitch
-          accentcolor={this.props.accentcolor}
-          addon={this.props.addon}
-          author={this.props.author}
-          category={this.props.category}
-          className="InstallButton-switch"
-          description={this.props.description}
-          detailURL={this.props.detailURL}
-          disabled={buttonIsDisabled}
-          enable={this.props.enable}
-          footer={this.props.footer}
-          footerURL={this.props.footerURL}
-          guid={this.props.guid}
-          handleChange={this.props.handleChange}
-          header={this.props.header}
-          headerURL={this.props.headerURL}
-          iconURL={this.props.iconURL}
-          id={this.props.id}
-          install={this.props.install}
-          installTheme={this.props.installTheme}
-          installURL={installURL}
-          name={this.props.name}
-          previewURL={this.props.previewURL}
-          slug={this.props.slug}
-          status={this.props.status}
-          textcolor={this.props.textcolor}
-          type={this.props.type}
-          uninstall={this.props.uninstall}
-          updateURL={this.props.updateURL}
-          version={this.props.version}
-        />
-        {button}
+      <div className="InstallButton">
+        {this.showLoadingAnimation() ? (
+          <div className="InstallButton-loading">
+            <AnimatedIcon alt={this.getButtonText()} name="loading" />
+          </div>
+        ) : (
+          <Button className={buttonClass} {...buttonProps}>
+            <Icon name={this.getIconName()} />
+            {this.getButtonText()}
+          </Button>
+        )}
       </div>
     );
   }
 }
 
-export function mapStateToProps(state) {
+export function mapStateToProps(state: AppState) {
   return {
     clientApp: state.api.clientApp,
     userAgentInfo: state.api.userAgentInfo,
   };
 }
 
-export default compose(
+const InstallButton: React.ComponentType<Props> = compose(
   withRouter,
   connect(mapStateToProps),
   translate(),
 )(InstallButtonBase);
+
+export default InstallButton;
